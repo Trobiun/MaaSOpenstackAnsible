@@ -1,4 +1,4 @@
 ansible==9.3.0
-python-libmaas @ git+https://github.com/Trobiun/python-libmaas@master
+python-libmaas@ git+https://github.com/Trobiun/python-libmaas@master
 packaging~=24.0
-argparse==1.4.0
+PyYAML~=6.0.1

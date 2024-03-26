@@ -11,6 +11,9 @@ from AnsibleMaaS import client, get_tags, get_machines
 # include rack_controllers as hosts, used as True to deploy openstack-ansible also on these hosts
 AnsibleMaaS.include_rack_controllers = True
 
+# the management network is used for connecting through SSH to hosts and for connecting to deployed containers
+management_network_name = 'management'
+
 
 def get_cidr_networks_config(cidr_networks, subnets):
     for name, cidr in cidr_networks.items():
@@ -123,13 +126,11 @@ def get_groups_config(cidr_networks, machines, tags):
             machine = machines['maas']['children'][hostname]
             management_ip = None
             if len(machine['ip_addresses']) > 0:
-                # ip_address = machine['ip_addresses'][0]  # TODO: take the IP of management subnet
                 for ip_address in machine['ip_addresses']:
                     ip_address_obj = ipaddress.ip_address(ip_address)
-                    for cidr_network in cidr_networks.values():
-                        if cidr_network is not None and ip_address_obj in cidr_network:
-                            management_ip = ip_address
-                            break
+                    management_network = cidr_networks[management_network_name]
+                    if management_network is not None and ip_address_obj in management_network:
+                        management_ip = ip_address
             groups[group_name][hostname] = {
                 'ip': management_ip,
                 'host_vars': {
@@ -146,7 +147,7 @@ def main():
     subnets = client.subnets.list()
     discoveries = client.discoveries.list()
     cidr_networks = {
-        'management': None,
+        management_network_name: None,
         'tunnel': None,
         'storage': None,
     }

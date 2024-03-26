@@ -29,7 +29,7 @@ from packaging import version
 
 # CONFIGURATION
 # Set the below variables to True or False
-sort_by_tags = True  # True will create a host group for each tag
+group_by_tags = True  # True will create a host group for each tag
 group_by_az = False  # True will create a host group for each availability zone
 group_by_pool = False  # True will create a host group for each resource pool
 include_bare_metal = True  # True will include KVM hosts in the inventory
@@ -71,18 +71,20 @@ if version.parse(ver) < version.parse(reqver):
 # to be more JSON and Ansible friendly
 def get_machines():
     machines = client.machines.list()
+    rack_controllers = []
+    # get rack_controllers if we want to include them
+    if include_rack_controllers:
+        rack_controllers = client.rack_controllers.list()
     maas_machines = {}
-    maas_group = {}
     for machine in machines:
-        tags = {}
         ifs = {}
         disks = {}
-        maas_group.update({machine.fqdn: "Null"})
         ostype = str(machine.osystem)
         oskernel = str(machine.distro_series)
         htags = list(machine.tags)
         interfaces = list(machine.interfaces)
         block_devices = list(machine.block_devices)
+        tags = [tag.name for tag in htags]
 
         ansible_user = none_user
         # Determine the ansible_user to assign by OS
@@ -95,8 +97,6 @@ def get_machines():
 
         # Build a list of tags for each machine instance
         if include_host_details:
-            for htag in htags:
-                tags.update({htag.name: "null"})
             this_os = ostype + "-" + oskernel
             # Build a dictionary of network interfaces for each machine instance
             for interface in interfaces:
@@ -159,59 +159,56 @@ def get_machines():
         else:
             maas_machines.update({host["hostname"]: host})
 
-    # add rack controllers to maas_machines if wanted
-    if include_rack_controllers:
-        rack_controllers = client.rack_controllers.list()
-        for rack_controller in rack_controllers:
-            tags = {}
-            ifs = {}
-            ostype = str(rack_controller.osystem)
-            oskernel = str(rack_controller.distro_series)
-            htags = list(rack_controller.tags)
-            interfaces = list(rack_controller.interfaces)
+    # do not need to test include_rack_controllers as rack_controllers list is empty
+    # if include_rack_controllers=False
+    for rack_controller in rack_controllers:
+        ifs = {}
+        ostype = str(rack_controller.osystem)
+        oskernel = str(rack_controller.distro_series)
+        htags = list(rack_controller.tags)
+        interfaces = list(rack_controller.interfaces)
+        tags = [tag.name for tag in htags]
 
-            if include_host_details:
-                for htag in htags:
-                    tags.update({htag.name: "null"})
-                this_os = ostype + "-" + oskernel
-                # Build a dictionary of network interfaces for each rack_controller instance
-                for interface in interfaces:
-                    ifs.update({interface.name: {
-                        "type": interface.type.name,
-                        "enabled": interface.enabled,
-                        "id": interface.id,
-                        "mac_address": interface.mac_address,
-                        "params": interface.params,
-                        "mtu": interface.effective_mtu,
-                    }
-                    })
-                # Build the root dictionary for each rack_controller instance
-                # with nested dictionaries for interfaces
-                host = {
-                    "ansible_host": rack_controller.fqdn,
-                    "ansible_user": None,  # TODO: get ansible_user
-                    "hostname": rack_controller.hostname,
-                    "architecture": rack_controller.architecture,
-                    "os": rack_controller.osystem,
-                    "distro_series": rack_controller.distro_series,
-                    "fqdn": rack_controller.fqdn,
-                    "cpus": rack_controller.cpus,
-                    "memory": rack_controller.memory,
-                    "interfaces": ifs,  # This is a dictionary
-                    "ip_addresses": rack_controller.ip_addresses,  # This is a list
-                    "system_id": rack_controller.system_id,
-                    "operating_system": this_os,
-                    "node_type": rack_controller.node_type,
-                    "zone": rack_controller.zone.name,
-                    "tags": tags
+        if include_host_details:
+            this_os = ostype + "-" + oskernel
+            # Build a dictionary of network interfaces for each rack_controller instance
+            for interface in interfaces:
+                ifs.update({interface.name: {
+                    "type": interface.type.name,
+                    "enabled": interface.enabled,
+                    "id": interface.id,
+                    "mac_address": interface.mac_address,
+                    "params": interface.params,
+                    "mtu": interface.effective_mtu,
                 }
-            else:
-                host = {
-                    "ansible_host": rack_controller.fqdn,
-                    "ansible_user": None,  # TODO: get ansible_user
-                    "hostname": rack_controller.hostname
-                }
-            maas_machines.update({host["hostname"]: host})
+                })
+            # Build the root dictionary for each rack_controller instance
+            # with nested dictionaries for interfaces
+            host = {
+                "ansible_host": rack_controller.fqdn,
+                "ansible_user": None,  # TODO: get ansible_user
+                "hostname": rack_controller.hostname,
+                "architecture": rack_controller.architecture,
+                "os": rack_controller.osystem,
+                "distro_series": rack_controller.distro_series,
+                "fqdn": rack_controller.fqdn,
+                "cpus": rack_controller.cpus,
+                "memory": rack_controller.memory,
+                "interfaces": ifs,  # This is a dictionary
+                "ip_addresses": rack_controller.ip_addresses,  # This is a list
+                "system_id": rack_controller.system_id,
+                "operating_system": this_os,
+                "node_type": rack_controller.node_type,
+                "zone": rack_controller.zone.name,
+                "tags": tags
+            }
+        else:
+            host = {
+                "ansible_host": rack_controller.fqdn,
+                "ansible_user": None,  # TODO: get ansible_user
+                "hostname": rack_controller.hostname
+            }
+        maas_machines.update({host["hostname"]: host})
     maas_data = {"children": maas_machines}
     maas_inventory = {"maas": maas_data}
     return maas_inventory
@@ -219,11 +216,9 @@ def get_machines():
 
 #
 def get_tags():
-    maas_tags = []
     maas_tag_groups = {}
     tags = client.tags.list()
-    for tag in tags:
-        maas_tags.append(tag.name)
+    maas_tags = [tag.name for tag in tags]
     maas_machines = client.machines.list()
     rack_controllers = []
     if include_rack_controllers:
@@ -241,6 +236,7 @@ def get_tags():
                 if status != -1:
                     maas_tag_groups[tag].append(machine.hostname)
         # do not need to test include_rack_controllers as rack_controllers list is empty
+        # if include_rack_controllers=False
         for rack_controller in rack_controllers:
             htag = repr(rack_controller.tags)
             status = htag.find(tag)
@@ -250,11 +246,9 @@ def get_tags():
 
 
 def get_zones():
-    maas_zones = []
     maas_zone_group = {}
     zones = client.zones.list()
-    for zone in zones:
-        maas_zones.append(zone.name)
+    maas_zones = [zone.name for zone in zones]
     maas_machines = client.machines.list()
     rack_controllers = []
     if include_rack_controllers:
@@ -269,6 +263,7 @@ def get_zones():
                 if include_bare_metal:
                     maas_zone_group[zone].append(machine.hostname)
         # do not need to test include_rack_controllers as rack_controllers list is empty
+        # if include_rack_controllers=False
         for rack_controller in rack_controllers:
             if rack_controller.zone.name == zone:
                 maas_zone_group[zone].append(rack_controller.hostname)
@@ -276,11 +271,9 @@ def get_zones():
 
 
 def get_pools():
-    maas_pools = []
     maas_pool_group = {}
     pools = client.resource_pools.list()
-    for pool in pools:
-        maas_pools.append(pool.name)
+    maas_pools = [pool.name for pool in pools]
     maas_machines = client.machines.list()
     rack_controllers = []
     if include_rack_controllers:
@@ -308,7 +301,7 @@ def get_inventory():
             "hostvars": {}
         }
     }
-    if sort_by_tags:
+    if group_by_tags:
         tags = get_tags()
         machines.update(tags)
     if group_by_az:

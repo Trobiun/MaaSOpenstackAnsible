@@ -27,7 +27,7 @@ Simple inventory that creates instance json records with MaaS attributes
 {
   "ansible_host": "vault.halo.lan",
   "ansible_user": "ubuntu",
-  "archictecture": "amd64/generic",
+  "architecture": "amd64/generic",
   "block_devices": {
     "sda": {
       "block_size": 512,

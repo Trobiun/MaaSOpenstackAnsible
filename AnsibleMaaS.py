@@ -6,6 +6,7 @@ import json
 import os
 
 import maas.client
+from dotenv import load_dotenv
 from packaging import version
 
 # Stuff needed to integrate as an Ansible plugin
@@ -45,6 +46,8 @@ centos7_user = "centos"
 centos8_user = "cloud-user"
 windows_user = "cloud-admin"
 
+load_dotenv()
+
 # Grab MAAS environment variables from the environment 
 api_key = os.getenv('MAAS_API_KEY')
 maas_url = os.getenv('MAAS_URL')
@@ -54,8 +57,7 @@ if api_key is None:
 if maas_url is None:
     raise OSError("MAAS_URL environment variable is not set. Please set the MAAS_URL environment variable!")
 # Connect to the MaaS API
-client = maas.client.connect(
-    maas_url, apikey=api_key)
+client = maas.client.connect(maas_url, apikey=api_key)
 
 # Test MaaS version. Tested against 2.9.1 and newer. Earlier releases have functional gaps.
 reqver = "2.9.1"  # Minimum required version of MaaS
@@ -77,8 +79,6 @@ def get_machines():
         rack_controllers = client.rack_controllers.list()
     maas_machines = {}
     for machine in machines:
-        ifs = {}
-        disks = {}
         ostype = str(machine.osystem)
         oskernel = str(machine.distro_series)
         htags = list(machine.tags)
@@ -99,29 +99,35 @@ def get_machines():
         if include_host_details:
             this_os = ostype + "-" + oskernel
             # Build a dictionary of network interfaces for each machine instance
-            for interface in interfaces:
-                ifs.update({interface.name: {
-                    "type": interface.type.name,
-                    "enabled": interface.enabled,
-                    "id": interface.id,
-                    "mac_address": interface.mac_address,
-                    "params": interface.params,
-                    "mtu": interface.effective_mtu,
+            ifs = [
+                {
+                    interface.name: {
+                        "type": interface.type.name,
+                        "enabled": interface.enabled,
+                        "id": interface.id,
+                        "mac_address": interface.mac_address,
+                        "params": interface.params,
+                        "mtu": interface.effective_mtu,
+                    }
                 }
-                })
+                for interface in interfaces
+            ]
             # Build a dictionary of block devices (disks) for each machine instance
-            for block_device in block_devices:
-                disks.update({block_device.name: {
-                    "type": block_device.type.name,
-                    "model": block_device.model,
-                    "used_for": block_device.used_for,
-                    "size": block_device.size,
-                    "used": block_device.used_size,
-                    "block_size": block_device.block_size,
-                    "id": block_device.id,
-                    "id_path": block_device.id_path,
+            disks = [
+                {
+                    block_device.name: {
+                        "type": block_device.type.name,
+                        "model": block_device.model,
+                        "used_for": block_device.used_for,
+                        "size": block_device.size,
+                        "used": block_device.used_size,
+                        "block_size": block_device.block_size,
+                        "id": block_device.id,
+                        "id_path": block_device.id_path,
+                    }
                 }
-                })
+                for block_device in block_devices
+            ]
             # Build the root dictionary for each machine instance
             # with nested dictionaries for interfaces and disks/block devices
             host = {
@@ -162,7 +168,6 @@ def get_machines():
     # do not need to test include_rack_controllers as rack_controllers list is empty
     # if include_rack_controllers=False
     for rack_controller in rack_controllers:
-        ifs = {}
         ostype = str(rack_controller.osystem)
         oskernel = str(rack_controller.distro_series)
         htags = list(rack_controller.tags)
@@ -172,16 +177,19 @@ def get_machines():
         if include_host_details:
             this_os = ostype + "-" + oskernel
             # Build a dictionary of network interfaces for each rack_controller instance
-            for interface in interfaces:
-                ifs.update({interface.name: {
-                    "type": interface.type.name,
-                    "enabled": interface.enabled,
-                    "id": interface.id,
-                    "mac_address": interface.mac_address,
-                    "params": interface.params,
-                    "mtu": interface.effective_mtu,
+            ifs = [
+                {
+                    interface.name: {
+                        "type": interface.type.name,
+                        "enabled": interface.enabled,
+                        "id": interface.id,
+                        "mac_address": interface.mac_address,
+                        "params": interface.params,
+                        "mtu": interface.effective_mtu,
+                    }
                 }
-                })
+                for interface in interfaces
+            ]
             # Build the root dictionary for each rack_controller instance
             # with nested dictionaries for interfaces
             host = {
@@ -228,12 +236,11 @@ def get_tags():
         for machine in maas_machines:
             htag = repr(machine.tags)
             status = htag.find(tag)
-            if not include_bare_metal:
-                if machine.power_type == "virsh" or machine.power_type == "lxd":
-                    if status != -1:
+            if status != -1:
+                if not include_bare_metal:
+                    if machine.power_type == "virsh" or machine.power_type == "lxd":
                         maas_tag_groups[tag].append(machine.hostname)
-            if include_bare_metal:
-                if status != -1:
+                else:
                     maas_tag_groups[tag].append(machine.hostname)
         # do not need to test include_rack_controllers as rack_controllers list is empty
         # if include_rack_controllers=False
@@ -260,7 +267,7 @@ def get_zones():
                 if not include_bare_metal:
                     if machine.power_type == "virsh" or machine.power_type == "lxd":
                         maas_zone_group[zone].append(machine.hostname)
-                if include_bare_metal:
+                else:
                     maas_zone_group[zone].append(machine.hostname)
         # do not need to test include_rack_controllers as rack_controllers list is empty
         # if include_rack_controllers=False
@@ -285,7 +292,7 @@ def get_pools():
                 if not include_bare_metal:
                     if machine.power_type == "virsh" or machine.power_type == "lxd":
                         maas_pool_group[pool].append(machine.hostname)
-                if include_bare_metal:
+                else:
                     maas_pool_group[pool].append(machine.hostname)
         # do not need to test include_rack_controllers as rack_controllers list is empty
         for rack_controller in rack_controllers:

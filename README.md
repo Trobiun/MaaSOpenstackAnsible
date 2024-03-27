@@ -136,7 +136,7 @@ Simple inventory that creates instance json records with MaaS attributes
 
 ## OpenstackAnsible.py
 
-This script try to generate an openstack_user_config.yml file with what it can read from Canonical MaaS.
+This script tries to generate an openstack_user_config.yml file with what it can read from Canonical MaaS.
 
 ```yaml
 ceph-mds_hosts: { }
@@ -238,7 +238,7 @@ Python libs:
 
 ## Edit AnsibleMaaS.py to set options:
 
-sort_by_tags = True # True will create a host group for each tag  
+group_by_tags = True # True will create a host group for each tag  
 group_by_az = True # True will create a host group for each availability zone  
 group_by_pool = True # True will create a host group for each resource pool  
 include_bare_metal = True # True will include KVM hosts in the inventory  

@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 # Script to generate a config for openstack-ansible from MaaS inventory
+# Import modules needed for this to work
+# If this errors use "pip" to install the needed modules (in requirements.txt)
 import datetime
 import ipaddress
 
@@ -13,6 +15,10 @@ AnsibleMaaS.include_rack_controllers = True
 
 # the management network is used for connecting through SSH to hosts and for connecting to deployed containers
 management_network_name = 'management'
+# the tunnel network is used for project VXLAN networks
+tunnel_network_name = 'tunnel'
+# the storage network is used for storage services such as cinder and swift
+storage_network_name = 'storage'
 
 
 def get_cidr_networks_config(cidr_networks, subnets):
@@ -50,7 +56,7 @@ def get_global_overrides_config():
                     'container_bridge': 'br-mgmt',
                     'container_interface': 'eth1',
                     'container_type': 'veth',
-                    'ip_from_q': 'management',
+                    'ip_from_q': management_network_name,
                     'is_management_address': True,
                 },
             },
@@ -69,7 +75,7 @@ def get_global_overrides_config():
                     'container_interface': 'eth2',
                     'container_type': 'veth',
                     'container_mtu': '9000',
-                    'ip_from_q': 'storage',
+                    'ip_from_q': storage_network_name,
                 }
             },
             {
@@ -81,7 +87,7 @@ def get_global_overrides_config():
                     'container_bridge': 'br-vxlan',
                     'container_type': 'veth',
                     'container_interface': 'eth10',
-                    'ip_from_q': 'tunnel',
+                    'ip_from_q': tunnel_network_name,
                     'range': '1:1000',
                     'net_name': 'vxlan',
                 }
@@ -148,8 +154,8 @@ def main():
     discoveries = client.discoveries.list()
     cidr_networks = {
         management_network_name: None,
-        'tunnel': None,
-        'storage': None,
+        tunnel_network_name: None,
+        storage_network_name: None,
     }
 
     cidr_networks_config = get_cidr_networks_config(cidr_networks=cidr_networks, subnets=subnets)

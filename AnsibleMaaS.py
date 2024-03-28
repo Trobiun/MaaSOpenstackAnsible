@@ -2,6 +2,7 @@
 # MaaS to Ansible Inventory Script
 # Import modules needed for this to work
 # If this errors use "pip" to install the needed modules (in requirements.txt)
+import getpass
 import json
 import os
 
@@ -79,9 +80,12 @@ def get_machines():
         if not exclude_powered_off_machines or (machine.power_state == PowerState.ON and exclude_powered_off_machines)
     ]
     rack_controllers = []
+    current_user = None
     # get rack_controllers if we want to include them
     if include_rack_controllers:
         rack_controllers = client.rack_controllers.list()
+        # we use the current user for rack controllers as they are probably not deployed by maas
+        current_user = getpass.getuser()
     maas_machines = {}
     for machine in machines:
         ostype = str(machine.osystem)
@@ -199,7 +203,7 @@ def get_machines():
             # with nested dictionaries for interfaces
             host = {
                 "ansible_host": rack_controller.fqdn,
-                "ansible_user": None,  # TODO: get ansible_user
+                "ansible_user": current_user,
                 "hostname": rack_controller.hostname,
                 "architecture": rack_controller.architecture,
                 "os": rack_controller.osystem,
@@ -218,7 +222,7 @@ def get_machines():
         else:
             host = {
                 "ansible_host": rack_controller.fqdn,
-                "ansible_user": None,  # TODO: get ansible_user
+                "ansible_user": current_user,
                 "hostname": rack_controller.hostname
             }
         maas_machines.update({host["hostname"]: host})

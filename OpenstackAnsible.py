@@ -16,6 +16,9 @@ AnsibleMaaS.include_rack_controllers = True
 # openstack_user_config.yml file which can be used later
 AnsibleMaaS.exclude_powered_off_machines = False
 
+# filename to use for generated config
+user_config_filename = 'openstack_user_config.yml.generated'
+
 # the management network is used for connecting through SSH to hosts and for connecting to deployed containers
 management_network_name = 'management'
 # the tunnel network is used for project VXLAN networks
@@ -171,7 +174,8 @@ def main():
         'used_ips': used_ips_config,
         **groups
     }
-    print(yaml.safe_dump(user_config))
+    with open(user_config_filename, 'w') as user_config_file:
+        yaml.safe_dump(user_config, user_config_file)
 
 
 if __name__ == '__main__':

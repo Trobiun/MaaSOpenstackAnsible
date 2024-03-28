@@ -303,7 +303,7 @@ used_ips:
 virtual_hosts: { }
 ```
 
-## Prerequisites:
+## Prerequisites
 
 ### Common
 
@@ -318,18 +318,17 @@ virtual_hosts: { }
 2. Every network needed for openstack-ansible must be in 1 `space` for 1 network in openstack_user_config.yml
 3. Every machine/host you want included in openstack_user_config.yml file must be tagged by at least one tag
 
-## Dependencies:
+## Dependencies
 
 Python libs:
 
-- ansible
+- ansible # optional
 - python-libmaas
-- yaml # for OpenstackAnsible
-- json
+- PyYAML # for OpenstackAnsible
+- python-dotenv
 - packaging
-- os
 
-## To Install:
+## To Install
 
 1. Clone this git repo.
 2. Install the dependencies.
@@ -346,22 +345,43 @@ Python libs:
    export MAAS_URL=http://(IP or FQDN):5240/MAAS/api/2.0 # FQDN and URL of your MaaS Region API.
    ```
 
-## Edit AnsibleMaaS.py to set options:
+## Edit AnsibleMaaS.py to set options
 
-group_by_tags = True # True will create a host group for each tag  
-group_by_az = True # True will create a host group for each availability zone  
-group_by_pool = True # True will create a host group for each resource pool  
-include_bare_metal = True # True will include KVM hosts in the inventory  
-include_host_details = True # Will include all known facts from MaaS into the inventory  
-include_rack_controllers = True # Will include rack controllers hosts in the inventory
-exclude_powered_off_machines = True # True will exclude machines without PowerState.ON
+- group_by_tags = True # True will create a host group for each tag
+- group_by_az = True # True will create a host group for each availability zone
+- group_by_pool = True # True will create a host group for each resource pool
+- include_bare_metal = True # True will include KVM hosts in the inventory
+- include_host_details = True # Will include all known facts from MaaS into the inventory
+- include_rack_controllers = True # Will include rack controllers hosts in the inventory
+- exclude_powered_off_machines = True # True will exclude machines without PowerState.ON
 
-### ansible_user to be used for differing OSs:
+## Edit OpenstackAnsible.py to set options
+
+OpenstackAnsible.py change some options of AnsibleMaaS.py after the imports,
+you can comment or change the values if you need.  
+The options changed are:
+
+- AnsibleMaaS.include_rack_controllers = True # we include rack controller for our use case
+- AnsibleMaaS.exclude_powered_off_machines = False # we do not exclude powered off hosts as the generated config may be
+  used later
+
+The specific options of OpenstackAnsible.py are:
+
+- user_config_filename = 'openstack_user_config.yml.generated' # the generated file will have this name
+- management_network_name = 'management' # the management network name for openstack-ansible
+- tunnel_network_name = 'tunnel' # the network name for VXLAN for openstack-ansible
+- storage_network_name = 'storage' # the storage network name for openstack-ansible
+
+### ansible_user to be used for differing OSs
 
 ubuntu_user = "ubuntu"        
 centos7_user = "centos"  
 centos8_user = "cloud-user"  
 windows_user = "cloud-admin"
+
+## Usage
+
+### AnsibleMaaS.py
 
 Once everything is set up simply execute an ansible module against the inventory.
 
@@ -375,7 +395,15 @@ and / or
 ansible-inventory --list
 ```
 
-## Connectivity and access issues.
+### OpenstackAnsible.py
+
+Once everything is set up, execute the script OpenstackAnsible.py to generate the openstack_user_config.yml file.
+
+You will probably need to edit a few values before deploying openstack-ansible, especially in `global_overrides`.  
+More info in
+the [deployment guide](https://docs.openstack.org/project-deploy-guide/openstack-ansible/latest/configure.html).
+
+## Connectivity and access issues
 
 MaaS deploys private keys on bare metal and vm instances. Whichever user is running ansible must have public keys
 associated with ssh on each instance ansible will need to access.
@@ -383,7 +411,9 @@ If you are unfamiliar with ansible, ansible-inventory or ssh, take the time to r
 Having a strategy on inventory and ssh is a good idea. Rotating keys, using secrets management are generally a good
 idea.
 
+## Useful links
+
 - Getting started with Ansible - https://docs.ansible.com/ansible/latest/getting_started/index.html
 - Ansible Connection Methods - https://docs.ansible.com/ansible/latest/user_guide/connection_details.html
 - Halo - https://www.halo.inc/ansible-integration-with-maas/
-- OpenstackAnsible - https://docs.openstack.org/openstack-ansible/latest/
+- Openstack-Ansible - https://docs.openstack.org/openstack-ansible/latest/

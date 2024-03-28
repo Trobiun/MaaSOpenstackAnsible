@@ -144,25 +144,105 @@ ceph-mon_hosts: { }
 ceph-nfs_hosts: { }
 ceph-osd_hosts: { }
 cidr_networks:
-  management: 172.20.90.0/24
-  storage: null
-  tunnel: null
+  - management: 172.20.90.0/24
+  - tunnel: None
+  - storage: None
 compute-infra_hosts:
   compute1:
     host_vars:
-      ansible_user: null
-    ip: null
+      ansible_user: ubuntu
+    ip: 172.20.90.4
+  compute2:
+    host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.5
+  compute3:
+    host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.6
+  compute4:
+    host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.7
 compute_hosts:
   compute1:
     host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.4
+  compute2:
+    host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.5
+  compute3:
+    host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.6
+  compute4:
+    host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.7
+dashboard_hosts:
+  mesocloud:
+    host_vars:
       ansible_user: null
-    ip: null
-dashboard_hosts: { }
+    ip: 172.20.90.10
 global_overrides:
-  external_lb_vip_address: ''
-  internal_lb_vip_address: ''
+  external_lb_vip_address: null
+  internal_lb_vip_address: null
   management_bridge: br-mgmt
-  provider_networks: [ ]
+  provider_networks:
+    - network:
+        container_bridge: br-mgmt
+        container_interface: eth1
+        container_type: veth
+        group_binds:
+          - all_containers
+          - hosts
+        ip_from_q: management
+        is_management_address: true
+        type: raw
+    - network:
+        container_bridge: br-storage
+        container_interface: eth2
+        container_mtu: '9000'
+        container_type: veth
+        group_binds:
+          - glance_api
+          - cinder_api
+          - cinder_volume
+          - nova_compute
+          - ceph-mon
+          - ceph-osd
+        ip_from_q: storage
+        type: raw
+    - network:
+        container_bridge: br-vxlan
+        container_interface: eth10
+        container_type: veth
+        group_binds:
+          - neutron_linuxbridge_agent
+        ip_from_q: tunnel
+        net_name: vxlan
+        range: 1:1000
+        type: vxlan
+    - network:
+        container_bridge: br-vlan
+        container_interface: eth11
+        container_type: veth
+        group_binds:
+          - neutron_linuxbridge_agent
+        net_name: vlan
+        range: 101:200,301:400
+        type: vlan
+    - network:
+        container_bridge: br-vlan
+        container_interface: eth12
+        container_type: veth
+        group_binds:
+          - neutron_linuxbridge_agent
+        host_bind_override: eth12
+        net_name: flat
+        type: flat
 haproxy_hosts: { }
 identity_hosts: { }
 image_hosts: { }
@@ -183,14 +263,44 @@ orchestration_hosts:
       ansible_user: null
     ip: 172.20.90.10
 repo-infra_hosts: { }
-shared-infra_hosts: { }
+shared-infra_hosts:
+  mesocloud:
+    host_vars:
+      ansible_user: null
+    ip: 172.20.90.10
 storage-infra_hosts: { }
-storage_hosts: { }
+storage_hosts:
+  compute1:
+    host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.4
+  compute2:
+    host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.5
+  compute3:
+    host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.6
+  compute4:
+    host_vars:
+      ansible_user: ubuntu
+    ip: 172.20.90.7
 used_ips:
-  - 172.20.91.10
-  - 172.20.90.10
+  - 172.20.90.233
   - 172.20.90.1
+  - 172.20.90.2
+  - 172.20.90.6
+  - 172.20.90.231
+  - 172.20.90.10
   - 172.20.90.254
+  - 172.20.90.7
+  - 172.20.90.232
+  - 172.20.91.10
+  - 172.20.90.5
+  - 172.20.90.3
+  - 172.20.90.4
+virtual_hosts: { }
 ```
 
 ## Prerequisites:
@@ -206,7 +316,7 @@ used_ips:
 
 1. All tags used by openstack-ansible need to be added (manually at the moment) in MaaS instance
 2. Every network needed for openstack-ansible must be in 1 `space` for 1 network in openstack_user_config.yml
-3. Every machine/host you want included in openstack_user_config.yml file must be tagged
+3. Every machine/host you want included in openstack_user_config.yml file must be tagged by at least one tag
 
 ## Dependencies:
 
@@ -244,6 +354,7 @@ group_by_pool = True # True will create a host group for each resource pool
 include_bare_metal = True # True will include KVM hosts in the inventory  
 include_host_details = True # Will include all known facts from MaaS into the inventory  
 include_rack_controllers = True # Will include rack controllers hosts in the inventory
+exclude_powered_off_machines = True # True will exclude machines without PowerState.ON
 
 ### ansible_user to be used for differing OSs:
 

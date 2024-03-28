@@ -7,6 +7,7 @@ import os
 
 import maas.client
 from dotenv import load_dotenv
+from maas.client.enum import PowerState
 from packaging import version
 
 # Stuff needed to integrate as an Ansible plugin
@@ -34,9 +35,10 @@ group_by_tags = True  # True will create a host group for each tag
 group_by_az = False  # True will create a host group for each availability zone
 group_by_pool = False  # True will create a host group for each resource pool
 include_bare_metal = True  # True will include KVM hosts in the inventory
-include_host_details = True  # Include all known attributes from MaaS or limit to hostname
+include_host_details = True  # True will include all known attributes from MaaS or limit to hostname
 
 include_rack_controllers = False  # True will include rack_controllers in the inventory
+exclude_powered_off_machines = True  # True will exclude machines without PowerState.ON
 
 # ansible_user to be used for differing OSs
 # none_user when machine is not deployed
@@ -72,7 +74,10 @@ if version.parse(ver) < version.parse(reqver):
 # Define function to pull machine instance info from the API and reformat data
 # to be more JSON and Ansible friendly
 def get_machines():
-    machines = client.machines.list()
+    machines = [
+        machine for machine in client.machines.list()
+        if not exclude_powered_off_machines or (machine.power_state == PowerState.ON and exclude_powered_off_machines)
+    ]
     rack_controllers = []
     # get rack_controllers if we want to include them
     if include_rack_controllers:
@@ -227,7 +232,10 @@ def get_tags():
     maas_tag_groups = {}
     tags = client.tags.list()
     maas_tags = [tag.name for tag in tags]
-    maas_machines = client.machines.list()
+    maas_machines = [
+        machine for machine in client.machines.list()
+        if not exclude_powered_off_machines or (machine.power_state == PowerState.ON and exclude_powered_off_machines)
+    ]
     rack_controllers = []
     if include_rack_controllers:
         rack_controllers = client.rack_controllers.list()
@@ -256,7 +264,10 @@ def get_zones():
     maas_zone_group = {}
     zones = client.zones.list()
     maas_zones = [zone.name for zone in zones]
-    maas_machines = client.machines.list()
+    maas_machines = [
+        machine for machine in client.machines.list()
+        if not exclude_powered_off_machines or (machine.power_state == PowerState.ON and exclude_powered_off_machines)
+    ]
     rack_controllers = []
     if include_rack_controllers:
         rack_controllers = client.rack_controllers.list()
@@ -281,7 +292,10 @@ def get_pools():
     maas_pool_group = {}
     pools = client.resource_pools.list()
     maas_pools = [pool.name for pool in pools]
-    maas_machines = client.machines.list()
+    maas_machines = [
+        machine for machine in client.machines.list()
+        if not exclude_powered_off_machines or (machine.power_state == PowerState.ON and exclude_powered_off_machines)
+    ]
     rack_controllers = []
     if include_rack_controllers:
         rack_controllers = client.rack_controllers.list()

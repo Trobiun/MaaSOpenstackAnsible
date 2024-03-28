@@ -12,6 +12,9 @@ from AnsibleMaaS import client, get_tags, get_machines
 
 # include rack_controllers as hosts, used as True to deploy openstack-ansible also on these hosts
 AnsibleMaaS.include_rack_controllers = True
+# not excluding powered off hosts as this script only generates an
+# openstack_user_config.yml file which can be used later
+AnsibleMaaS.exclude_powered_off_machines = False
 
 # the management network is used for connecting through SSH to hosts and for connecting to deployed containers
 management_network_name = 'management'

@@ -26,6 +26,9 @@ tunnel_network_name = 'tunnel'
 # the storage network is used for storage services such as cinder and swift
 storage_network_name = 'storage'
 
+# the number of days to be taken into account for discoveries
+nb_days_discoveries = 7
+
 
 def get_cidr_networks_config(cidr_networks, subnets):
     for name, cidr in cidr_networks.items():
@@ -34,15 +37,17 @@ def get_cidr_networks_config(cidr_networks, subnets):
             for subnet in subnets:
                 if space_vlan.id == subnet.vlan.id:
                     cidr_networks[name] = ipaddress.ip_network(subnet.cidr)
-    cidr_networks_config = [{name: str(cidr)} for name, cidr in cidr_networks.items()]
+    cidr_networks_config = [{name: str(cidr) if cidr else None} for name, cidr in cidr_networks.items()]
     return cidr_networks_config
 
 
 def get_used_ips_config(discoveries):
-    one_week = datetime.timedelta(weeks=1)
+    days = datetime.timedelta(days=nb_days_discoveries)
     now = datetime.datetime.now()
-    last_week = (now - one_week).date()
-    used_ips_config = list(set([discovery.ip for discovery in discoveries if discovery.last_seen.date() > last_week]))
+    last_seen_max = (now - days).date()
+    used_ips_config = list(
+        set([discovery.ip for discovery in discoveries if discovery.last_seen.date() > last_seen_max])
+    )
     return used_ips_config
 
 

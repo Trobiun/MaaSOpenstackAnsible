@@ -372,7 +372,7 @@ The specific options of OpenstackAnsible.py are:
 - tunnel_network_name = 'tunnel' # the network name for VXLAN for openstack-ansible
 - storage_network_name = 'storage' # the storage network name for openstack-ansible
 
-### ansible_user to be used for differing OSs
+## ansible_user to be used for differing OSs
 
 ubuntu_user = "ubuntu"        
 centos7_user = "centos"  

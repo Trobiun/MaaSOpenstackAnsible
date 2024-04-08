@@ -334,6 +334,7 @@ Python libs:
 2. Install the dependencies.
    ```shell
    cd MaaSOpenstackAnsible
+   # you can also install it in virtualenv
    sudo pip install -r requirements.txt
    ```
 3. Copy the AnsibleMaaS.py file to the directory where you manage your ansible dynamic inventory.  

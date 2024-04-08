@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # Script to generate a config for openstack-ansible from MaaS inventory
 # Import modules needed for this to work
 # If this errors use "pip" to install the needed modules (in requirements.txt)

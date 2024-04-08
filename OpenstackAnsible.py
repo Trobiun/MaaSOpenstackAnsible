@@ -158,7 +158,7 @@ def get_groups_config(cidr_networks, machines, tags):
 
 
 def main():
-    machines = get_machines()
+    machines = get_machines({})
     tags = get_tags()
     machines.update(tags)
     subnets = client.subnets.list()

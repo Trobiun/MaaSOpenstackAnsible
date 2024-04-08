@@ -3,6 +3,7 @@
 # Import modules needed for this to work
 # If this errors use "pip" to install the needed modules (in requirements.txt)
 import getpass
+import ipaddress
 import json
 import os
 
@@ -41,6 +42,9 @@ include_host_details = True  # True will include all known attributes from MaaS 
 include_rack_controllers = False  # True will include rack_controllers in the inventory
 exclude_powered_off_machines = True  # True will exclude machines without PowerState.ON
 
+# name of space to get ip of machines for ansible
+ansible_management_space_name = 'management'
+
 # ansible_user to be used for differing OSs
 # none_user when machine is not deployed
 none_user = None
@@ -74,7 +78,7 @@ if version.parse(ver) < version.parse(reqver):
 
 # Define function to pull machine instance info from the API and reformat data
 # to be more JSON and Ansible friendly
-def get_machines():
+def get_machines(meta: dict):
     machines = [
         machine for machine in client.machines.list()
         if not exclude_powered_off_machines or (machine.power_state == PowerState.ON and exclude_powered_off_machines)
@@ -86,6 +90,15 @@ def get_machines():
         rack_controllers = client.rack_controllers.list()
         # we use the current user for rack controllers as they are probably not deployed by maas
         current_user = getpass.getuser()
+
+    # get management network from specific space
+    space = client.spaces.get(ansible_management_space_name)
+    subnets = client.subnets.list()
+    management_network = None
+    for space_vlan in space.vlans:
+        for subnet in subnets:
+            if space_vlan.id == subnet.vlan.id:
+                management_network = ipaddress.ip_network(subnet.cidr)
     maas_machines = {}
     for machine in machines:
         ostype = str(machine.osystem)
@@ -104,7 +117,8 @@ def get_machines():
         if machine.osystem == "centos" and machine.distro_series == "7":
             ansible_user = centos7_user
 
-        # Build a list of tags for each machine instance
+        ansible_ip = [ip for ip in machine.ip_addresses if ipaddress.ip_address(ip) in management_network][0]
+
         if include_host_details:
             this_os = ostype + "-" + oskernel
             # Build a dictionary of network interfaces for each machine instance
@@ -140,7 +154,7 @@ def get_machines():
             # Build the root dictionary for each machine instance
             # with nested dictionaries for interfaces and disks/block devices
             host = {
-                "ansible_host": machine.fqdn,
+                "ansible_host": ansible_ip,
                 "ansible_user": ansible_user,
                 "hostname": machine.hostname,
                 "status": machine.status.name,
@@ -163,15 +177,17 @@ def get_machines():
             }
         else:
             host = {
-                "ansible_host": machine.fqdn,
+                "ansible_host": ansible_ip,
                 "ansible_user": ansible_user,
                 "hostname": machine.hostname
             }
         # Add each machine dictionary into a root dictionary as elements
         if not include_bare_metal:
             if machine.power_type == "virsh" or machine.power_type == "lxd":
+                meta.update({host["hostname"]: host})
                 maas_machines.update({host["hostname"]: host})
         else:
+            meta.update({host["hostname"]: host})
             maas_machines.update({host["hostname"]: host})
 
     # do not need to test include_rack_controllers as rack_controllers list is empty
@@ -182,6 +198,8 @@ def get_machines():
         htags = list(rack_controller.tags)
         interfaces = list(rack_controller.interfaces)
         tags = [tag.name for tag in htags]
+
+        ansible_ip = [ip for ip in rack_controller.ip_addresses if ipaddress.ip_address(ip) in management_network][0]
 
         if include_host_details:
             this_os = ostype + "-" + oskernel
@@ -202,7 +220,7 @@ def get_machines():
             # Build the root dictionary for each rack_controller instance
             # with nested dictionaries for interfaces
             host = {
-                "ansible_host": rack_controller.fqdn,
+                "ansible_host": ansible_ip,
                 "ansible_user": current_user,
                 "hostname": rack_controller.hostname,
                 "architecture": rack_controller.architecture,
@@ -221,10 +239,11 @@ def get_machines():
             }
         else:
             host = {
-                "ansible_host": rack_controller.fqdn,
+                "ansible_host": ansible_ip,
                 "ansible_user": current_user,
                 "hostname": rack_controller.hostname
             }
+        meta.update({host["hostname"]: host})
         maas_machines.update({host["hostname"]: host})
     maas_data = {"children": maas_machines}
     maas_inventory = {"maas": maas_data}
@@ -320,12 +339,12 @@ def get_pools():
 
 
 def get_inventory():
-    machines = get_machines()
     meta = {
         "_meta": {
             "hostvars": {}
         }
     }
+    machines = get_machines(meta)
     if group_by_tags:
         tags = get_tags()
         machines.update(tags)
